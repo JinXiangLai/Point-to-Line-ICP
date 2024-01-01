@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
 	std::normal_distribution<double> distribution(0., 0.01);
 
 
-	EdgePoint2LineICP *eH;
+	std::vector<EdgePoint2LineICP*> es;
 	for (int i = 0; i < linePoints1.cols() / 2; ++i) {
 		// 添加测量噪声用
 		double noise = distribution(generator);
@@ -140,13 +140,15 @@ int main(int argc, char** argv) {
 		// 默认信息矩阵值是0,所以必须给定
 		e1->setInformation(Eigen::Matrix3d::Identity());
 		optimizer.addEdge(e1);
-		eH = e1;
 
 		const Eigen::Vector3d pb2 = linePoints2.col(2 * i + 1); // + vecNoise;
 		EdgePoint2LineICP *e2 = new EdgePoint2LineICP(pw1, pw2, pb2);
 		e2->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(0)));
 		e2->setInformation(Eigen::Matrix3d::Identity());
 		optimizer.addEdge(e2);
+
+		es.push_back(e1);
+		es.push_back(e2);
 	}
 
 	// Step 3: 执行优化
@@ -157,13 +159,18 @@ int main(int argc, char** argv) {
 	optimizer.computeActiveErrors();
 	std::cout << "initial optimizer.chi2(): " << optimizer.chi2() << std::endl;
 
-	optimizer.optimize(its);
+	
 
 	std::cout<<"====== Nullspace ======\n";
-	const Eigen::Matrix<double, 6, 6> H1 = eH->GetHessian();
-	Eigen::JacobiSVD<Eigen::Matrix<double, 6, 6>> svd(H1, Eigen::ComputeFullU | Eigen::ComputeFullV);
+	Eigen::MatrixXd J(3 * es.size(), 6);
+	for(size_t i=0; i<es.size(); ++i){
+		J.block<3, 6>(i*3, 0) = es[i]->GetJacobian();
+	}
+	Eigen::JacobiSVD<Eigen::MatrixXd> svd(J.transpose()*J, Eigen::ComputeFullU | Eigen::ComputeFullV);
 	// 多少个为0就说明多少个量不可观，即系统自由度
 	std::cout << "singularValues: " << svd.singularValues().transpose() << std::endl;
+
+	optimizer.optimize(its);
 
 	VertexEigenPose* Twb_recovery = static_cast<VertexEigenPose*>(optimizer.vertex(0));
 	Sophus::SE3d Twb_final(Twb_recovery->estimate().qrb, Twb_recovery->estimate().trb);

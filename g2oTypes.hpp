@@ -160,13 +160,19 @@ public:
 
 	Eigen::Matrix<double, 6, 6> GetHessian(){
 		computeError();
+		double dataB[18] = {0.};
+		new (&_jacobianOplusXi) JacobianXiOplusType(dataB, 3, 6);
 		linearizeOplus();
-		std::cout << _jacobianOplusXi.transpose() * _information * _jacobianOplusXi << std::endl;
+		// std::cout << _jacobianOplusXi.transpose() * _information * _jacobianOplusXi << std::endl;
 		return _jacobianOplusXi.transpose() * _information * _jacobianOplusXi;
 	}
 
-	Eigen::MatrixXd GetJacobian(){
-		return Eigen::MatrixXd();
+	Eigen::Matrix<double, 3, 6> GetJacobian(){
+		computeError();
+		double dataB[18] = {0.};
+		new (&_jacobianOplusXi) JacobianXiOplusType(dataB, 3, 6);
+		linearizeOplus();
+		return _jacobianOplusXi;
 	}
 
     Eigen::Vector3d ref_p1;
